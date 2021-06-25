@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { useUser } from '../components/UserContext';
-import LoadingDots from '../components/ui/LoadingDots';
-import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
-import Logo from '../components/icons/Logo';
-import GitHub from '../components/icons/GitHub';
+
+import Button from '@/components/ui/Button';
+import GitHub from '@/components/icons/GitHub';
+import Input from '@/components/ui/Input';
+import LoadingDots from '@/components/ui/LoadingDots';
+import Logo from '@/components/icons/Logo';
+import { useUser } from '@/utils/useUser';
 
 const SignIn = () => {
   const [email, setEmail] = useState('');
@@ -18,7 +19,7 @@ const SignIn = () => {
   const { user, signIn } = useUser();
 
   const handleSignin = async (e) => {
-    if (e.preventDefault) e.preventDefault();
+    e.preventDefault();
 
     setLoading(true);
     setMessage({});
@@ -53,8 +54,8 @@ const SignIn = () => {
 
   if (!user)
     return (
-      <div className="w-80 flex flex-col justify-between p-3 max-w-lg m-auto my-64">
-        <form onSubmit={handleSignin}>
+      <div className="flex justify-center height-screen-helper">
+        <div className="flex flex-col justify-between max-w-lg p-3 m-auto w-80 ">
           <div className="flex justify-center pb-12 ">
             <Logo width="64px" height="64px" />
           </div>
@@ -70,50 +71,54 @@ const SignIn = () => {
                 {message.content}
               </div>
             )}
-            <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={setEmail}
-              required
-            />
-            <div
-              className={`w-full flex flex-col ${
-                showPasswordInput || password.length ? 'hidden' : ''
-              }`}
-            >
-              <Button
-                variant="slim"
-                type={!password.length ? 'submit' : 'button'}
-                loading={!password.length && loading}
-                disabled={!email.length}
-                onClick={handleSignin}
-              >
-                Send magic link
-              </Button>
-            </div>
 
-            <div
-              className={`flex flex-col space-y-4 ${
-                showPasswordInput || password.length ? '' : 'hidden'
-              }`}
-            >
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={setPassword}
-              />
-              <Button
-                className="mt-1"
-                variant="slim"
-                type={password.length ? 'submit' : 'button'}
-                loading={!!password.length && loading}
-                disabled={!password.length}
-              >
-                Sign in
-              </Button>
-            </div>
+            {!showPasswordInput && (
+              <form onSubmit={handleSignin} className="flex flex-col space-y-4">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={setEmail}
+                  required
+                />
+                <Button
+                  variant="slim"
+                  type="submit"
+                  loading={loading}
+                  disabled={!email.length}
+                >
+                  Send magic link
+                </Button>
+              </form>
+            )}
+
+            {showPasswordInput && (
+              <form onSubmit={handleSignin} className="flex flex-col space-y-4">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={setEmail}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={setPassword}
+                  required
+                />
+                <Button
+                  className="mt-1"
+                  variant="slim"
+                  type="submit"
+                  loading={loading}
+                  disabled={!password.length || !email.length}
+                >
+                  Sign in
+                </Button>
+              </form>
+            )}
 
             <span className="pt-1 text-center text-sm">
               <a
@@ -121,14 +126,12 @@ const SignIn = () => {
                 className="text-accents-7 text-accent-9 hover:underline cursor-pointer"
                 onClick={() => {
                   if (showPasswordInput) setPassword('');
-                  setShowPasswordInput(!showPasswordInput && !password.length);
+                  setShowPasswordInput(!showPasswordInput);
                   setMessage({});
                 }}
               >
                 {`Or sign in with ${
-                  showPasswordInput || !!password.length
-                    ? 'magic link'
-                    : 'password'
+                  showPasswordInput ? 'magic link' : 'password'
                 }.`}
               </a>
             </span>
@@ -143,29 +146,29 @@ const SignIn = () => {
               </Link>
             </span>
           </div>
-        </form>
 
-        <div className="flex items-center my-6">
-          <div
-            className="border-t border-accents-2 flex-grow mr-3"
-            aria-hidden="true"
-          ></div>
-          <div className="text-accents-4 italic">Or</div>
-          <div
-            className="border-t border-accents-2 flex-grow ml-3"
-            aria-hidden="true"
-          ></div>
+          <div className="flex items-center my-6">
+            <div
+              className="border-t border-accents-2 flex-grow mr-3"
+              aria-hidden="true"
+            ></div>
+            <div className="text-accents-4">Or</div>
+            <div
+              className="border-t border-accents-2 flex-grow ml-3"
+              aria-hidden="true"
+            ></div>
+          </div>
+
+          <Button
+            variant="slim"
+            type="submit"
+            disabled={loading}
+            onClick={() => handleOAuthSignIn('github')}
+          >
+            <GitHub />
+            <span className="ml-2">Continue with GitHub</span>
+          </Button>
         </div>
-
-        <Button
-          variant="slim"
-          type="submit"
-          disabled={loading}
-          onClick={() => handleOAuthSignIn('github')}
-        >
-          <GitHub />
-          <span className="ml-2">Continue with GitHub</span>
-        </Button>
       </div>
     );
 

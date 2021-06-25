@@ -1,7 +1,10 @@
-import { supabaseAdmin } from './initSupabaseAdmin';
-import { stripe } from './initStripe';
+import { supabaseAdmin } from './supabase-admin';
+import { stripe } from './stripe';
 import { toDateTime } from './helpers';
 
+// This entire file should be removed and moved to supabase-admin
+// It's not a react hook, so it shouldn't have useDatabase format
+// It should also properly catch and throw errors
 const upsertProductRecord = async (product) => {
   const productData = {
     id: product.id,
@@ -86,12 +89,9 @@ const copyBillingDetailsToCustomer = async (uuid, payment_method) => {
 
 const manageSubscriptionStatusChange = async (
   subscriptionId,
+  customerId,
   createAction = false
 ) => {
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-    expand: ['default_payment_method']
-  });
-  const customerId = subscription.customer;
   // Get customer's UUID from mapping table.
   const {
     data: { id: uuid },
@@ -102,12 +102,10 @@ const manageSubscriptionStatusChange = async (
     .eq('stripe_customer_id', customerId)
     .single();
   if (noCustomerError) throw noCustomerError;
-  // For a new subscription copy the billing details to the customer object.
-  if (createAction && subscription.default_payment_method)
-    await copyBillingDetailsToCustomer(
-      uuid,
-      subscription.default_payment_method
-    );
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ['default_payment_method']
+  });
   // Upsert the latest status of the subscription object.
   const subscriptionData = {
     id: subscription.id,
@@ -142,6 +140,14 @@ const manageSubscriptionStatusChange = async (
   console.log(
     `Inserted/updated subscription [${subscription.id}] for user [${uuid}]`
   );
+
+  // For a new subscription copy the billing details to the customer object.
+  // NOTE: This is a costly operation and should happen at the very end.
+  if (createAction && subscription.default_payment_method)
+    await copyBillingDetailsToCustomer(
+      uuid,
+      subscription.default_payment_method
+    );
 };
 
 export {

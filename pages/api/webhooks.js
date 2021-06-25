@@ -1,34 +1,27 @@
-import { stripe } from '../../utils/initStripe';
+import { stripe } from '@/utils/stripe';
 import {
   upsertProductRecord,
   upsertPriceRecord,
-  manageSubscriptionStatusChange,
-} from '../../utils/useDatabase';
+  manageSubscriptionStatusChange
+} from '@/utils/useDatabase';
 
 // Stripe requires the raw body to construct the event.
 export const config = {
   api: {
-    bodyParser: false,
-  },
+    bodyParser: false
+  }
 };
 
-const buffer = (req) => {
-  return new Promise((resolve, reject) => {
-    const body = [];
-    req
-      .on('data', (chunk) => {
-        body.push(chunk);
-      })
-      .on('end', () => {
-        resolve(Buffer.concat(body));
-      })
-      .on('error', (err) => {
-        reject(err);
-      });
-  });
-};
+async function buffer(readable) {
+  const chunks = [];
+  for await (const chunk of readable) {
+    chunks.push(
+      typeof chunk === "string" ? Buffer.from(chunk) : chunk
+    );
+  }
+  return Buffer.concat(chunks);
+}
 
-// TODO: deleted events and tax rate events?
 const relevantEvents = new Set([
   'product.created',
   'product.updated',
@@ -37,20 +30,21 @@ const relevantEvents = new Set([
   'checkout.session.completed',
   'customer.subscription.created',
   'customer.subscription.updated',
-  'customer.subscription.deleted',
+  'customer.subscription.deleted'
 ]);
 
 const webhookHandler = async (req, res) => {
   if (req.method === 'POST') {
     const buf = await buffer(req);
     const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret =
+      process.env.STRIPE_WEBHOOK_SECRET_LIVE ??
+      process.env.STRIPE_WEBHOOK_SECRET;
     let event;
 
     try {
       event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
     } catch (err) {
-      // On error, log and return the error message.
       console.log(`❌ Error message: ${err.message}`);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
@@ -71,6 +65,7 @@ const webhookHandler = async (req, res) => {
           case 'customer.subscription.deleted':
             await manageSubscriptionStatusChange(
               event.data.object.id,
+              event.data.object.customer,
               event.type === 'customer.subscription.created'
             );
             break;
@@ -78,7 +73,11 @@ const webhookHandler = async (req, res) => {
             const checkoutSession = event.data.object;
             if (checkoutSession.mode === 'subscription') {
               const subscriptionId = checkoutSession.subscription;
-              await manageSubscriptionStatusChange(subscriptionId, true);
+              await manageSubscriptionStatusChange(
+                subscriptionId,
+                checkoutSession.customer,
+                true
+              );
             }
             break;
           default:
@@ -86,11 +85,10 @@ const webhookHandler = async (req, res) => {
         }
       } catch (error) {
         console.log(error);
-        return res.status(400).send('Webhook handler failed. View logs.');
+        return res.json({ error: 'Webhook handler failed. View logs.' });
       }
     }
 
-    // Return a response to acknowledge receipt of the event.
     res.json({ received: true });
   } else {
     res.setHeader('Allow', 'POST');
